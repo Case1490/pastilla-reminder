@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# la plantilla sí se versiona: no lleva valores, solo documenta cuáles hacen falta
+!.env.example
 
 # vercel
 .vercel

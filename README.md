@@ -1,36 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Recordatorio de pastillas
 
-## Getting Started
+App personal para el seguimiento de la medicación diaria de Irma: media pastilla
+por la mañana y media por la noche. Registra cada toma, lleva la cuenta del stock
+restante y envía recordatorios al celular por [ntfy](https://ntfy.sh).
 
-First, run the development server:
+- **Next.js 16** (App Router) sobre **Supabase** (Postgres + Edge Functions)
+- Notificaciones push vía ntfy, sin necesidad de cuenta ni servidor propio
+- Instalable como PWA
+
+## Cómo funciona
+
+| Pieza | Rol |
+| --- | --- |
+| `app/page.tsx` | Pantalla principal: confirmar las dos tomas del día |
+| `app/history` | Historial mensual y porcentaje de cumplimiento |
+| `app/settings` | Canal ntfy, horarios, reintento y stock |
+| `app/api/*` | Route handlers; **todo** el acceso a la base pasa por aquí |
+| `supabase/functions/send-reminder` | Edge Function que decide y envía los avisos |
+| `supabase/migrations` | Esquema versionado |
+
+### El modelo de datos
+
+`reminder_config` es una única fila (`id = 1`) con la configuración. `pill_logs`
+guarda una fila por dosis y día, con un índice único sobre `(dose, log_date)`.
+
+`log_date` es la fecha calendario **en Lima**, escrita explícitamente por el
+servidor. Existe porque el día natural de una toma no coincide con el día UTC: la
+dosis de las 20:00 de Lima cae al día siguiente en UTC. Todos los filtros del
+historial y de "hoy" van contra esa columna.
+
+El stock se cuenta en **mitades**, no en pastillas: cada toma descuenta 1. Diez
+pastillas son 20 de stock.
+
+### Seguridad
+
+Las dos tablas tienen RLS activo y ninguna política, así que las llaves `anon` y
+`authenticated` no tienen acceso. Las lecturas y escrituras las hace el servidor
+con la `service_role`, que hace bypass de RLS y nunca sale del backend.
+
+La app no tiene login: quien tenga la URL puede usarla. Eso es deliberado para un
+uso doméstico, pero significa que la URL de despliegue no debería compartirse.
+
+## Puesta en marcha
 
 ```bash
+npm install
+cp .env.example .env.local   # y rellenar los valores
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+En http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Base de datos
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npx supabase login
+npx supabase link --project-ref TU_PROJECT_REF
+npx supabase db push
+```
 
-## Learn More
+### Edge Function
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npx supabase functions deploy send-reminder
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` las inyecta Supabase sola; no hay
+que configurar secretos.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Recordatorios automáticos
 
-## Deploy on Vercel
+Sin esto la app funciona, pero **no avisa nada**. Hay que ejecutar
+[`supabase/setup-cron.sql`](supabase/setup-cron.sql) una vez desde el SQL Editor
+del dashboard; el propio archivo explica los dos pasos.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Programa `pg_cron` para invocar la Edge Function cada 15 minutos. En cada corrida
+la función mira, para cada dosis: si ya pasó la hora, si no está confirmada y si
+toca reintentar según `followup_minutes`. Insiste hasta 4 veces y deja de hacerlo
+4 horas después de la hora prevista. Es idempotente, así que ejecutarla de más no
+duplica avisos.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Notificaciones en el celular
+
+1. Instalar la app **ntfy** (Android / iOS).
+2. Suscribirse a un topic con un nombre difícil de adivinar — los topics de
+   ntfy.sh son públicos para quien conozca el nombre.
+3. Poner ese mismo nombre en Configuración y usar "Enviar notificación de prueba".
+
+## Despliegue
+
+```bash
+npx vercel
+```
+
+Configurar en Vercel las mismas dos variables de `.env.local`. La Edge Function y
+el cron viven en Supabase, así que son independientes del despliegue del front.

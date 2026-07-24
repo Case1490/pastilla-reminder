@@ -30,5 +30,6 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "_comment": "supabase/functions corre en Deno, con sus propios globals y URLs de import. Compilarlo con la config de Next solo produce errores falsos.",
+  "exclude": ["node_modules", "supabase/functions"]
 }

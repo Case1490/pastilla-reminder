@@ -1,26 +1,329 @@
-@import "tailwindcss";
+/* Un solo sistema de estilos para las tres pantallas.
+   Antes la portada llevaba su propia paleta verde en estilos inline y las otras
+   dos usaban estas variables, así que no combinaban entre sí. */
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #0a0a0a;
+  --bg-card: #111111;
+  --bg-hover: #1a1a1a;
+
+  --border: #222222;
+  --border-strong: #333333;
+
+  --text-primary: #f0f0f0;
+  --text-secondary: #8a8a8a;
+  --text-muted: #555555;
+
+  --accent: #6dc88a;
+  --accent-soft: rgba(109, 200, 138, 0.1);
+  --accent-border: rgba(109, 200, 138, 0.28);
+
+  --morning: #d8c874;
+  --evening: #8899cc;
+
+  --danger: #ff5c5c;
+  --danger-soft: rgba(255, 92, 92, 0.08);
+  --warning: #f5a623;
+  --warning-soft: rgba(245, 166, 35, 0.08);
+
+  --radius: 14px;
+  --maxw: 380px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--accent);
+  color: #08160e;
+}
+
+/* Cualquier cosa enfocada por teclado tiene que verse. Los botones originales
+   solo cambiaban con onMouseEnter, así que no existían para el teclado. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------- estructura ---------- */
+
+.screen {
+  min-height: 100svh;
+  padding: 2rem 1.25rem 3rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.screen--center {
+  justify-content: center;
+}
+
+.stack {
+  width: 100%;
+  max-width: var(--maxw);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* La entrada la resuelve CSS. Antes dependía de un estado `mounted` que se
+   activaba desde un efecto, lo que forzaba un render extra en cada pantalla. */
+.fade {
+  animation: rise 0.45s ease both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade {
+    animation: none;
+  }
+}
+
+/* ---------- tipografía ---------- */
+
+.eyebrow {
+  font-size: 0.65rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.label {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.link {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  letter-spacing: 0.04em;
+  transition: color 0.2s ease;
+}
+
+.link:hover {
+  color: var(--text-primary);
+}
+
+/* ---------- superficies ---------- */
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+}
+
+.alert {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.alert--warning {
+  border: 1px solid rgba(245, 166, 35, 0.3);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.alert--danger {
+  border: 1px solid rgba(255, 92, 92, 0.3);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.alert--ok {
+  border: 1px solid var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ---------- controles ---------- */
+
+.input {
+  width: 100%;
+  padding: 0.8rem 0.95rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.input:focus {
+  border-color: var(--accent);
+}
+
+.btn {
+  width: 100%;
+  padding: 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--text-muted);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn--accent {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.btn--accent:hover:not(:disabled) {
+  background: rgba(109, 200, 138, 0.18);
+  border-color: var(--accent);
+}
+
+.btn--ghost {
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+.btn--inline {
+  width: auto;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.65rem;
+}
+
+/* ---------- tarjetas de dosis ---------- */
+
+.dose {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 1.35rem;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-card);
+  transition: border-color 0.3s ease;
+}
+
+.dose[data-taken='true'] {
+  border-color: var(--accent-border);
+}
+
+.dose__glyph {
+  position: absolute;
+  right: 1.15rem;
+  top: 1.15rem;
+  opacity: 0.16;
+}
+
+.dose__time {
+  font-size: 2rem;
+  font-weight: 200;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.dose__status {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  font-size: 0.75rem;
+  color: var(--accent);
+}
+
+/* ---------- historial ---------- */
+
+.day {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.8rem 0.9rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.day[data-today='true'] {
+  border-color: var(--accent-border);
+}
+
+.day__slot {
+  flex: 1;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  text-align: center;
+}
+
+.day__slot[data-state='taken'] {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.day__slot[data-state='missed'] {
+  border-color: rgba(255, 92, 92, 0.25);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.day__slot[data-state='pending'] {
+  color: var(--text-muted);
 }
