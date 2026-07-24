@@ -4,17 +4,26 @@
 -- Vault, y `supabase db push` no puede resolver eso solo. Se ejecuta una vez, a
 -- mano, desde el SQL Editor del dashboard de Supabase.
 --
--- PASO 1 — guardar la llave en Vault. Reemplaza el placeholder por el valor de
--- SUPABASE_SERVICE_ROLE_KEY (Dashboard → Project Settings → API) y ejecútalo:
+-- PASO 1 — guardar la service role key en Vault (Dashboard → Project Settings →
+-- API). Se guarda cifrada, así que no queda a la vista en la definición del cron.
+-- Reemplaza el placeholder y ejecuta este bloque; es idempotente, así que sirve
+-- también para rotar la llave más adelante.
 --
---   select vault.create_secret(
---     'PEGA_AQUI_LA_SERVICE_ROLE_KEY',
---     'pastilla_service_role_key',
---     'Llave usada por el cron para invocar la edge function send-reminder'
---   );
---
--- Se guarda cifrada, así que no queda a la vista en la definición del cron.
--- Para rotarla después: select vault.update_secret(id, 'nueva_llave')
+--   do $$
+--   declare
+--     v_id uuid;
+--   begin
+--     select id into v_id from vault.secrets where name = 'pastilla_service_role_key';
+--     if v_id is null then
+--       perform vault.create_secret(
+--         'PEGA_AQUI_LA_SERVICE_ROLE_KEY',
+--         'pastilla_service_role_key',
+--         'Llave que usa el cron para invocar la edge function send-reminder'
+--       );
+--     else
+--       perform vault.update_secret(v_id, 'PEGA_AQUI_LA_SERVICE_ROLE_KEY');
+--     end if;
+--   end $$;
 --
 -- PASO 2 — ejecutar todo lo de abajo.
 

@@ -93,6 +93,16 @@ alter table public.pill_logs add constraint pill_logs_dose_valid
 create unique index if not exists pill_logs_dose_log_date_uniq
   on public.pill_logs (dose, log_date);
 
+-- Ya existía `pill_logs_dose_day_unique` sobre la expresión
+-- (dose, date(scheduled_time at time zone 'America/Lima')), que impone la misma
+-- regla. No era el constraint el que faltaba: PostgREST no sabe nombrar un
+-- índice por expresión en on_conflict, y por eso el upsert daba 42703.
+--
+-- Se elimina porque ahora es redundante y además peligroso: confirm_dose
+-- resuelve el conflicto contra (dose, log_date), así que una violación del
+-- índice viejo escaparía al ON CONFLICT y saldría como error 23505.
+drop index if exists public.pill_logs_dose_day_unique;
+
 create index if not exists pill_logs_log_date_idx
   on public.pill_logs (log_date desc);
 
@@ -163,10 +173,25 @@ end $$;
 alter table public.pill_logs       enable row level security;
 alter table public.reminder_config enable row level security;
 
-drop policy if exists "public read"  on public.pill_logs;
-drop policy if exists "public write" on public.pill_logs;
-drop policy if exists "public read"  on public.reminder_config;
-drop policy if exists "public write" on public.reminder_config;
+-- Se enumeran las políticas existentes en vez de nombrarlas: activar RLS no
+-- sirve de nada si queda una política permisiva viva, y sus nombres dependen de
+-- cómo se creó el proyecto (la UI de Supabase genera cosas como "Enable read
+-- access for all users"). Un `drop policy if exists` con nombres adivinados
+-- falla en silencio, que es exactamente lo que pasó la primera vez.
+do $$
+declare
+  pol record;
+begin
+  for pol in
+    select policyname, tablename
+      from pg_policies
+     where schemaname = 'public'
+       and tablename in ('pill_logs', 'reminder_config')
+  loop
+    execute format('drop policy %I on public.%I', pol.policyname, pol.tablename);
+    raise notice 'política eliminada: %.%', pol.tablename, pol.policyname;
+  end loop;
+end $$;
 
 -- confirm_dose es SECURITY DEFINER: sin este revoke, anon podría llamarla vía
 -- PostgREST y saltarse RLS por la puerta de atrás.
