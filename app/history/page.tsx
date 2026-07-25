@@ -13,6 +13,9 @@ interface Day {
 export default function History() {
   const [days, setDays] = useState<Day[]>([])
   const [today, setToday] = useState('')
+  // Fecha del primer registro que existe. Todo lo anterior es "sin seguimiento",
+  // no incumplimiento.
+  const [startDate, setStartDate] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [cursor, setCursor] = useState(() => {
@@ -34,6 +37,7 @@ export default function History() {
         if (cancelled) return
         setDays(body.days)
         setToday(body.today)
+        setStartDate(body.startDate ?? null)
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'No se pudo cargar el historial')
       } finally {
@@ -51,11 +55,14 @@ export default function History() {
       return { year: d.getFullYear(), month: d.getMonth() }
     })
 
-  // Solo cuentan los días ya transcurridos: los futuros no son incumplimiento.
-  const past = days.filter(d => d.date <= today)
+  // Cuentan los días transcurridos desde que empezó el seguimiento: los futuros
+  // no son incumplimiento, y los anteriores a la app tampoco (antes contaban como
+  // omitidos y hundían el porcentaje). Un día ya rastreado sin toma sí cuenta.
+  const past = startDate ? days.filter(d => d.date >= startDate && d.date <= today) : []
   const total = past.length * 2
   const taken = past.reduce((n, d) => n + (d.morning ? 1 : 0) + (d.evening ? 1 : 0), 0)
-  const pct = total > 0 ? Math.round((taken / total) * 100) : 0
+  const hasData = total > 0
+  const pct = hasData ? Math.round((taken / total) * 100) : 0
 
   const monthLabel = new Date(cursor.year, cursor.month).toLocaleDateString('es-PE', {
     month: 'long',
@@ -89,16 +96,22 @@ export default function History() {
               fontWeight: 300,
               letterSpacing: '-0.03em',
               lineHeight: 1,
-              color: pct >= 80 ? 'var(--accent)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)',
+              color: !hasData
+                ? 'var(--text-muted)'
+                : pct >= 80
+                  ? 'var(--accent)'
+                  : pct >= 50
+                    ? 'var(--warning)'
+                    : 'var(--danger)',
             }}
           >
-            {pct}
-            <span style={{ fontSize: '1.35rem' }}>%</span>
+            {hasData ? pct : '—'}
+            {hasData && <span style={{ fontSize: '1.35rem' }}>%</span>}
           </span>
           <div>
             <p style={{ fontSize: '0.85rem' }}>Cumplimiento</p>
             <p className="hint">
-              {taken} de {total} dosis
+              {hasData ? `${taken} de ${total} dosis` : 'Sin registros este mes'}
             </p>
           </div>
         </div>
@@ -127,7 +140,7 @@ export default function History() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {days.map(day => (
-              <DayRow key={day.date} day={day} today={today} />
+              <DayRow key={day.date} day={day} today={today} startDate={startDate} />
             ))}
           </div>
         )}
@@ -136,9 +149,12 @@ export default function History() {
   )
 }
 
-function DayRow({ day, today }: { day: Day; today: string }) {
+function DayRow({ day, today, startDate }: { day: Day; today: string; startDate: string | null }) {
   const isToday = day.date === today
-  const isPast = day.date < today
+  // Un día anterior al inicio del seguimiento no es omitido: la app no existía.
+  // Se trata como los días futuros (neutro, sin "Omitida").
+  const preApp = !!startDate && day.date < startDate
+  const isPast = day.date < today && !preApp
 
   const label = new Date(`${day.date}T12:00:00`).toLocaleDateString('es-PE', {
     weekday: 'short',

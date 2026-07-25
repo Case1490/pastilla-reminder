@@ -22,13 +22,29 @@ export async function GET(req: Request) {
   // Con log_date esto es una comparación de fechas exacta. Antes se filtraba por
   // rangos de timestamp construidos en hora local del navegador, que se corrían
   // unas horas en los días del borde del mes.
-  const { data, error } = await supabaseAdmin
-    .from('pill_logs')
-    .select('dose, log_date, taken_at')
-    .gte('log_date', start)
-    .lte('log_date', end)
+  //
+  // `firstLog` es la fecha del primer registro que existe: el día en que empezó
+  // el seguimiento. El cliente la usa para no contar como "omitidos" los días
+  // anteriores a que la app existiera, que hundían el porcentaje de cumplimiento.
+  const [monthLogs, firstLog] = await Promise.all([
+    supabaseAdmin
+      .from('pill_logs')
+      .select('dose, log_date, taken_at')
+      .gte('log_date', start)
+      .lte('log_date', end),
+    supabaseAdmin
+      .from('pill_logs')
+      .select('log_date')
+      .order('log_date', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ])
 
-  if (error) return fail('No se pudo leer el historial', 500, error)
+  if (monthLogs.error) return fail('No se pudo leer el historial', 500, monthLogs.error)
+  if (firstLog.error) return fail('No se pudo leer el historial', 500, firstLog.error)
+
+  const data = monthLogs.data
+  const startDate = firstLog.data?.log_date ?? null
 
   const days: Record<string, { date: string; morning: string | null; evening: string | null }> = {}
   const lastDay = Number(end.slice(-2))
@@ -43,5 +59,5 @@ export async function GET(req: Request) {
     if (day) day[log.dose as 'morning' | 'evening'] = log.taken_at
   }
 
-  return ok({ today: limaDate(), days: Object.values(days) })
+  return ok({ today: limaDate(), startDate, days: Object.values(days) })
 }
