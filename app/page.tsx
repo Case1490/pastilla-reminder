@@ -148,7 +148,7 @@ export default function Home() {
             >
               <div>
                 <p className="eyebrow">Stock de pastillas</p>
-                <p style={{ fontSize: '1.35rem', fontWeight: 200, marginTop: '0.25rem' }}>
+                <p style={{ fontSize: '1.35rem', fontWeight: 300, marginTop: '0.25rem' }}>
                   {Math.floor(stock / 2)}
                   <span className="hint" style={{ marginLeft: '0.4rem' }}>
                     pastillas · {stock} mitades

@@ -3,28 +3,34 @@
    dos usaban estas variables, así que no combinaban entre sí. */
 
 :root {
-  --bg: #0a0a0a;
-  --bg-card: #111111;
-  --bg-hover: #1a1a1a;
+  --bg: #f4f6f4;
+  --bg-card: #ffffff;
+  --bg-hover: #ecefec;
 
-  --border: #222222;
-  --border-strong: #333333;
+  --border: #e2e6e2;
+  --border-strong: #ccd2cc;
 
-  --text-primary: #f0f0f0;
-  --text-secondary: #8a8a8a;
-  --text-muted: #555555;
+  --text-primary: #16201a;
+  --text-secondary: #5d6a61;
+  --text-muted: #909a93;
 
-  --accent: #6dc88a;
-  --accent-soft: rgba(109, 200, 138, 0.1);
-  --accent-border: rgba(109, 200, 138, 0.28);
+  /* En claro el verde tiene que ser bastante más oscuro que el original
+     (#6dc88a) para seguir legible sobre blanco: aquel daba 1.9:1. */
+  --accent: #1f7a45;
+  --accent-soft: rgba(31, 122, 69, 0.08);
+  --accent-border: rgba(31, 122, 69, 0.22);
 
-  --morning: #d8c874;
-  --evening: #8899cc;
+  --morning: #a1720a;
+  --evening: #4a5da6;
 
-  --danger: #ff5c5c;
-  --danger-soft: rgba(255, 92, 92, 0.08);
-  --warning: #f5a623;
-  --warning-soft: rgba(245, 166, 35, 0.08);
+  --danger: #c1332e;
+  --danger-soft: rgba(193, 51, 46, 0.07);
+  --warning: #a06a00;
+  --warning-soft: rgba(160, 106, 0, 0.08);
+
+  /* Sobre fondo claro el borde solo no separa la tarjeta del fondo; la sombra
+     hace el trabajo que antes hacía el contraste entre dos negros distintos. */
+  --shadow: 0 1px 2px rgba(22, 32, 26, 0.04), 0 6px 16px rgba(22, 32, 26, 0.05);
 
   --radius: 14px;
   --maxw: 380px;
@@ -47,7 +53,7 @@ body {
 
 ::selection {
   background: var(--accent);
-  color: #08160e;
+  color: #ffffff;
 }
 
 /* Cualquier cosa enfocada por teclado tiene que verse. Los botones originales
@@ -150,6 +156,7 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1.25rem;
+  box-shadow: var(--shadow);
 }
 
 .alert {
@@ -163,13 +170,13 @@ body {
 }
 
 .alert--warning {
-  border: 1px solid rgba(245, 166, 35, 0.3);
+  border: 1px solid rgba(160, 106, 0, 0.24);
   background: var(--warning-soft);
   color: var(--warning);
 }
 
 .alert--danger {
-  border: 1px solid rgba(255, 92, 92, 0.3);
+  border: 1px solid rgba(193, 51, 46, 0.24);
   background: var(--danger-soft);
   color: var(--danger);
 }
@@ -187,7 +194,7 @@ body {
   padding: 0.8rem 0.95rem;
   border-radius: 10px;
   border: 1px solid var(--border-strong);
-  background: transparent;
+  background: var(--bg-card);
   color: var(--text-primary);
   font-size: 0.9rem;
   font-family: inherit;
@@ -204,7 +211,7 @@ body {
   padding: 0.85rem;
   border-radius: 10px;
   border: 1px solid var(--border-strong);
-  background: transparent;
+  background: var(--bg-card);
   color: var(--text-primary);
   font-size: 0.75rem;
   letter-spacing: 0.1em;
@@ -216,7 +223,7 @@ body {
 
 .btn:hover:not(:disabled) {
   background: var(--bg-hover);
-  border-color: var(--text-muted);
+  border-color: var(--text-secondary);
 }
 
 .btn:disabled {
@@ -231,7 +238,7 @@ body {
 }
 
 .btn--accent:hover:not(:disabled) {
-  background: rgba(109, 200, 138, 0.18);
+  background: rgba(31, 122, 69, 0.14);
   border-color: var(--accent);
 }
 
@@ -255,24 +262,30 @@ body {
   position: relative;
   overflow: hidden;
   background: var(--bg-card);
+  box-shadow: var(--shadow);
   transition: border-color 0.3s ease;
 }
 
 .dose[data-taken='true'] {
   border-color: var(--accent-border);
+  background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--bg-card);
 }
 
+/* Sobre blanco un 0.16 deja el glifo casi invisible; el icono ya es un detalle
+   de fondo por su tamaño y posición, no hace falta apagarlo tanto. */
 .dose__glyph {
   position: absolute;
   right: 1.15rem;
   top: 1.15rem;
-  opacity: 0.16;
+  opacity: 0.32;
 }
 
+/* Los pesos hairline (200) se rompen sobre fondo claro: el trazo queda tan fino
+   que la hora, que es lo más importante de la tarjeta, pierde presencia. */
 .dose__time {
   font-size: 2rem;
-  font-weight: 200;
-  letter-spacing: -0.04em;
+  font-weight: 300;
+  letter-spacing: -0.03em;
   line-height: 1;
 }
 
@@ -298,6 +311,7 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(22, 32, 26, 0.04);
 }
 
 .day[data-today='true'] {
@@ -319,7 +333,7 @@ body {
 }
 
 .day__slot[data-state='missed'] {
-  border-color: rgba(255, 92, 92, 0.25);
+  border-color: rgba(193, 51, 46, 0.22);
   background: var(--danger-soft);
   color: var(--danger);
 }

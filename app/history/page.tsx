@@ -86,8 +86,8 @@ export default function History() {
           <span
             style={{
               fontSize: '2.75rem',
-              fontWeight: 200,
-              letterSpacing: '-0.04em',
+              fontWeight: 300,
+              letterSpacing: '-0.03em',
               lineHeight: 1,
               color: pct >= 80 ? 'var(--accent)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)',
             }}

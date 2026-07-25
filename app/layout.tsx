@@ -11,15 +11,16 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: 'Pastillas',
-    statusBarStyle: 'black-translucent',
+    // Con fondo claro el texto blanco de la barra de estado desaparece.
+    statusBarStyle: 'default',
   },
   // Es una app privada de uso personal: no tiene nada que hacer en un buscador.
   robots: { index: false, follow: false },
 }
 
 export const viewport: Viewport = {
-  themeColor: '#0a0a0a',
-  colorScheme: 'dark',
+  themeColor: '#f4f6f4',
+  colorScheme: 'light',
   width: 'device-width',
   initialScale: 1,
   // viewportFit cover para que el fondo llegue bajo el notch en pantalla completa.
