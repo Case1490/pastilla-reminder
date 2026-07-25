@@ -87,6 +87,18 @@ duplica avisos.
    ntfy.sh son públicos para quien conozca el nombre.
 3. Poner ese mismo nombre en Configuración y usar "Enviar notificación de prueba".
 
+## Pruebas
+
+```bash
+npm test
+```
+
+Cubre con [Vitest](https://vitest.dev) las dos zonas donde ya hubo bugs de fecha:
+`app/lib/lima.ts` (conversión de zona horaria y rangos de mes) y la decisión de
+qué recordatorio enviar, extraída a `supabase/functions/send-reminder/logic.ts`
+como función pura para poder probar el cruce de medianoche y los reintentos sin
+red ni base de datos.
+
 ## Despliegue
 
 ```bash

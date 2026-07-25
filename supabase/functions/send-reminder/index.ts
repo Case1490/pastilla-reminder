@@ -1,50 +1,17 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { limaParts, dueReminders, type PillLogRow } from './logic.ts'
 
 // Invocada por pg_cron cada 15 minutos. En cada corrida decide, para cada dosis
 // del día, si toca avisar; y avisa una vez al día si el stock está bajo.
 // Es idempotente: correrla de más no manda notificaciones de más.
-
-const TZ = 'America/Lima'
-const TZ_OFFSET = '-05:00' // Perú no tiene horario de verano
-const WINDOW_MINUTES = 4 * 60 // tras 4h sin confirmar, se deja de insistir
-const MAX_NOTIFICATIONS = 4 // aviso inicial + 3 reintentos
+//
+// La decisión de qué avisar vive en logic.ts (puro y testeado); aquí queda solo
+// el I/O: leer config y logs, enviar por ntfy y registrar el aviso.
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 )
-
-interface PillLogRow {
-  dose: 'morning' | 'evening'
-  log_date: string
-  taken_at: string | null
-  last_notified_at: string | null
-  notify_count: number
-}
-
-/**
- * La versión anterior hacía `new Date(d.toLocaleString('en-US', {timeZone}))` y
- * luego `.toISOString()`, que aplica el desfase dos veces: el runtime corre en
- * UTC, así que entre las 19:00 y la medianoche de Lima calculaba el día
- * siguiente y buscaba el log equivocado.
- */
-function limaParts(d: Date) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: TZ,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(d)
-  const get = (type: string) => parts.find(p => p.type === type)!.value
-  return {
-    date: `${get('year')}-${get('month')}-${get('day')}`,
-    hour: Number(get('hour')) % 24,
-    minute: Number(get('minute')),
-  }
-}
 
 async function notify(topic: string, title: string, body: string, priority = 'high') {
   const res = await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, {
@@ -64,7 +31,7 @@ Deno.serve(async () => {
   const now = new Date()
   const { date: today, hour, minute } = limaParts(now)
   // La ventana de 4h de una dosis puede cruzar la medianoche, y tras las 00:00
-  // "hoy" ya es otro día. Se evalúa también ayer para no perder esa cola.
+  // "hoy" ya es otro día. Se consulta también ayer para no perder esa cola.
   const yesterday = limaParts(new Date(now.getTime() - 86_400_000)).date
   const actions: string[] = []
 
@@ -94,49 +61,24 @@ Deno.serve(async () => {
     return Response.json({ error: 'No se pudo leer el registro del día' }, { status: 500 })
   }
 
-  const doses = [
-    { dose: 'morning' as const, hour: config.morning_hour, label: 'mañana', emoji: '🌅' },
-    { dose: 'evening' as const, hour: config.evening_hour, label: 'noche', emoji: '🌙' },
-  ]
-
-  // Cada dosis se evalúa en su ocurrencia de ayer y la de hoy. El instante
-  // programado es absoluto, así que la ventana se mide en tiempo real y cruzar la
-  // medianoche deja de importar: antes, tras las 00:00, la cola de la toma
-  // nocturna caía como `elapsed` negativo y se dejaba de insistir. La
-  // comprobación de ventana descarta sola las ocurrencias fuera de rango.
-  const occurrences = doses.flatMap(d =>
-    [yesterday, today].map(date => {
-      const scheduledTime = `${date}T${String(d.hour).padStart(2, '0')}:00:00${TZ_OFFSET}`
-      return { ...d, logDate: date, scheduledTime, scheduled: new Date(scheduledTime) }
-    })
+  const reminders = dueReminders(
+    now,
+    {
+      morning_hour: config.morning_hour,
+      evening_hour: config.evening_hour,
+      followup_minutes: config.followup_minutes,
+    },
+    logs as PillLogRow[]
   )
 
-  for (const occ of occurrences) {
-    const elapsed = (now.getTime() - occ.scheduled.getTime()) / 60000
-    if (elapsed < 0) continue // todavía no es la hora
-    if (elapsed > WINDOW_MINUTES) continue // la ventana ya cerró
-
-    const log = (logs as PillLogRow[]).find(
-      l => l.dose === occ.dose && l.log_date === occ.logDate
-    )
-    if (log?.taken_at) continue
-    if ((log?.notify_count ?? 0) >= MAX_NOTIFICATIONS) continue
-
-    // El reintento se mide contra el último aviso real, no contra la grilla del
-    // cron, así que no depende de que las corridas caigan exactas.
-    if (log?.last_notified_at) {
-      const sinceLast = (now.getTime() - new Date(log.last_notified_at).getTime()) / 60000
-      if (sinceLast < config.followup_minutes) continue
-    }
-
-    const attempt = (log?.notify_count ?? 0) + 1
+  for (const r of reminders) {
     try {
       await notify(
         config.ntfy_topic,
-        `Pastilla de la ${occ.label}`,
-        attempt === 1
-          ? `${occ.emoji} Es hora de tomar tu media pastilla de la ${occ.label}. Confírmalo en la app.`
-          : `${occ.emoji} Recordatorio ${attempt}: aún no confirmas la media pastilla de la ${occ.label}.`
+        `Pastilla de la ${r.label}`,
+        r.attempt === 1
+          ? `${r.emoji} Es hora de tomar tu media pastilla de la ${r.label}. Confírmalo en la app.`
+          : `${r.emoji} Recordatorio ${r.attempt}: aún no confirmas la media pastilla de la ${r.label}.`
       )
     } catch (e) {
       console.error('ntfy', e)
@@ -145,17 +87,17 @@ Deno.serve(async () => {
 
     const { error } = await supabase.from('pill_logs').upsert(
       {
-        dose: occ.dose,
-        log_date: occ.logDate,
-        scheduled_time: occ.scheduledTime,
+        dose: r.dose,
+        log_date: r.logDate,
+        scheduled_time: r.scheduledTime,
         last_notified_at: now.toISOString(),
-        notify_count: attempt,
+        notify_count: r.attempt,
       },
       { onConflict: 'dose,log_date' }
     )
     if (error) console.error('upsert log', error)
 
-    actions.push(`${occ.dose}@${occ.logDate}:aviso#${attempt}`)
+    actions.push(`${r.dose}@${r.logDate}:aviso#${r.attempt}`)
   }
 
   // Alerta de stock: la pantalla de configuración la prometía pero no existía en
