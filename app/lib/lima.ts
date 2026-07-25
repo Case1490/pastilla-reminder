@@ -19,19 +19,6 @@ export function limaDate(d: Date = new Date()): string {
   return `${get('year')}-${get('month')}-${get('day')}`
 }
 
-/** Hora y minuto del reloj en Lima. */
-export function limaClock(d: Date = new Date()): { hour: number; minute: number } {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: TZ,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(d)
-  const get = (type: string) => Number(parts.find(p => p.type === type)!.value)
-  // hourCycle h23 puede devolver 24 a la medianoche en algunos runtimes.
-  return { hour: get('hour') % 24, minute: get('minute') }
-}
-
 /** Instante ISO de una hora concreta de un día concreto, en Lima. */
 export function limaInstant(date: string, hour: number, minute = 0): string {
   const hh = String(hour).padStart(2, '0')

@@ -18,7 +18,7 @@ const EMPTY: Config = {
   evening_hour: '20',
   followup_minutes: '30',
   pill_stock: '0',
-  pill_stock_alert: '14',
+  pill_stock_alert: '7',
 }
 
 export default function Settings() {
@@ -40,7 +40,7 @@ export default function Settings() {
           evening_hour: String(body.evening_hour ?? 20),
           followup_minutes: String(body.followup_minutes ?? 30),
           pill_stock: String(body.pill_stock ?? 0),
-          pill_stock_alert: String(body.pill_stock_alert ?? 14),
+          pill_stock_alert: String(body.pill_stock_alert ?? 7),
         })
       } catch (e) {
         setNotice({

@@ -14,7 +14,6 @@ create table if not exists public.reminder_config (
   morning_hour     integer     not null default 8,
   evening_hour     integer     not null default 20,
   followup_minutes integer     not null default 30,
-  timezone         text        not null default 'America/Lima',
   pill_stock       integer     not null default 0,
   pill_stock_alert integer     not null default 7,
   updated_at       timestamptz not null default now()
@@ -50,6 +49,11 @@ begin
 end $$;
 
 alter table public.reminder_config drop column if exists callmebot_apikey;
+
+-- La zona horaria está fija en 'America/Lima' en el código (app/lib/lima.ts y la
+-- edge function); esta columna nunca se leía. Se elimina para que el esquema no
+-- sugiera una configuración que no existe.
+alter table public.reminder_config drop column if exists timezone;
 
 -- Marca de la última alerta de stock enviada, para no repetirla cada vez que
 -- corre el cron.
