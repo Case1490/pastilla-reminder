@@ -16,6 +16,7 @@ const supabase = createClient(
 
 interface PillLogRow {
   dose: 'morning' | 'evening'
+  log_date: string
   taken_at: string | null
   last_notified_at: string | null
   notify_count: number
@@ -62,7 +63,9 @@ async function notify(topic: string, title: string, body: string, priority = 'hi
 Deno.serve(async () => {
   const now = new Date()
   const { date: today, hour, minute } = limaParts(now)
-  const nowMinutes = hour * 60 + minute
+  // La ventana de 4h de una dosis puede cruzar la medianoche, y tras las 00:00
+  // "hoy" ya es otro día. Se evalúa también ayer para no perder esa cola.
+  const yesterday = limaParts(new Date(now.getTime() - 86_400_000)).date
   const actions: string[] = []
 
   const { data: config, error: configError } = await supabase
@@ -83,8 +86,8 @@ Deno.serve(async () => {
 
   const { data: logs, error: logsError } = await supabase
     .from('pill_logs')
-    .select('dose, taken_at, last_notified_at, notify_count')
-    .eq('log_date', today)
+    .select('dose, log_date, taken_at, last_notified_at, notify_count')
+    .in('log_date', [yesterday, today])
 
   if (logsError) {
     console.error('logs', logsError)
@@ -96,12 +99,26 @@ Deno.serve(async () => {
     { dose: 'evening' as const, hour: config.evening_hour, label: 'noche', emoji: '🌙' },
   ]
 
-  for (const d of doses) {
-    const elapsed = nowMinutes - d.hour * 60
-    if (elapsed < 0) continue // todavía no es la hora
-    if (elapsed > WINDOW_MINUTES) continue // la ventana del día ya cerró
+  // Cada dosis se evalúa en su ocurrencia de ayer y la de hoy. El instante
+  // programado es absoluto, así que la ventana se mide en tiempo real y cruzar la
+  // medianoche deja de importar: antes, tras las 00:00, la cola de la toma
+  // nocturna caía como `elapsed` negativo y se dejaba de insistir. La
+  // comprobación de ventana descarta sola las ocurrencias fuera de rango.
+  const occurrences = doses.flatMap(d =>
+    [yesterday, today].map(date => {
+      const scheduledTime = `${date}T${String(d.hour).padStart(2, '0')}:00:00${TZ_OFFSET}`
+      return { ...d, logDate: date, scheduledTime, scheduled: new Date(scheduledTime) }
+    })
+  )
 
-    const log = (logs as PillLogRow[]).find(l => l.dose === d.dose)
+  for (const occ of occurrences) {
+    const elapsed = (now.getTime() - occ.scheduled.getTime()) / 60000
+    if (elapsed < 0) continue // todavía no es la hora
+    if (elapsed > WINDOW_MINUTES) continue // la ventana ya cerró
+
+    const log = (logs as PillLogRow[]).find(
+      l => l.dose === occ.dose && l.log_date === occ.logDate
+    )
     if (log?.taken_at) continue
     if ((log?.notify_count ?? 0) >= MAX_NOTIFICATIONS) continue
 
@@ -116,10 +133,10 @@ Deno.serve(async () => {
     try {
       await notify(
         config.ntfy_topic,
-        `Pastilla de la ${d.label}`,
+        `Pastilla de la ${occ.label}`,
         attempt === 1
-          ? `${d.emoji} Es hora de tomar tu media pastilla de la ${d.label}. Confírmalo en la app.`
-          : `${d.emoji} Recordatorio ${attempt}: aún no confirmas la media pastilla de la ${d.label}.`
+          ? `${occ.emoji} Es hora de tomar tu media pastilla de la ${occ.label}. Confírmalo en la app.`
+          : `${occ.emoji} Recordatorio ${attempt}: aún no confirmas la media pastilla de la ${occ.label}.`
       )
     } catch (e) {
       console.error('ntfy', e)
@@ -128,9 +145,9 @@ Deno.serve(async () => {
 
     const { error } = await supabase.from('pill_logs').upsert(
       {
-        dose: d.dose,
-        log_date: today,
-        scheduled_time: `${today}T${String(d.hour).padStart(2, '0')}:00:00${TZ_OFFSET}`,
+        dose: occ.dose,
+        log_date: occ.logDate,
+        scheduled_time: occ.scheduledTime,
         last_notified_at: now.toISOString(),
         notify_count: attempt,
       },
@@ -138,7 +155,7 @@ Deno.serve(async () => {
     )
     if (error) console.error('upsert log', error)
 
-    actions.push(`${d.dose}:aviso#${attempt}`)
+    actions.push(`${occ.dose}@${occ.logDate}:aviso#${attempt}`)
   }
 
   // Alerta de stock: la pantalla de configuración la prometía pero no existía en
