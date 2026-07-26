@@ -84,7 +84,7 @@ export default function Home() {
         <header style={{ textAlign: 'center' }}>
           <p className="eyebrow">Medicación diaria</p>
           <h1 className="title" style={{ margin: '0.35rem 0 0.2rem' }}>
-            Irma
+            Jaquelina Atuncar
           </h1>
           <p className="hint" style={{ textTransform: 'capitalize' }}>
             {dateLabel}
